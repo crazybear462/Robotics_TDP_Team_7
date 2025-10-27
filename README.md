@@ -8,4 +8,7 @@ This is the code respository for UoG Robotics_TDP Team 7
 - Robust tests, clear docs, and reproducible results
 
 ## Project Schedule
-![project_schedule](images/Project Schedule.png)
+<p align="center">
+  <img src="images/Project Schedule.png" width="1000">
+</p>
+
