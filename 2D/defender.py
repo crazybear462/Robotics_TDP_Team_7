@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 # ----------------------------
 fieldLength = 9.0   # meters
 fieldWidth = 6.0
-goalWidth = 2.6     # proportionally smaller goals
+goalWidth = 2.6
 
 # ----------------------------
 # Robot parameters
