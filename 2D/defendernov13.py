@@ -12,16 +12,16 @@ dangerZone = 2.0  # meters from goal
 # ----------------------------
 # Robot parameters
 # ----------------------------
-robotSpeed = 0.5
+robotSpeed = 0.25
 robotRadius = 0.2
 
 # ----------------------------
 # Ball parameters
 # ----------------------------
 ballRadius = 0.07
-ballPos = np.array([fieldLength / 2, fieldWidth / 2], dtype=float)
+ballPos = np.array([fieldLength / 2, 2], dtype=float)
 ballVel = np.array([0.0, 0.0])
-kickSpeed = 1.2
+kickSpeed = 0.5
 collisionThreshold = 0.1
 ballOwner = 0  # 0 = free, 1–8 = robot index
 
@@ -71,14 +71,14 @@ ax.add_patch(plt.Rectangle((fieldLength - 0.2, fieldWidth / 2 - goalWidth / 2), 
 
 # Robot plots
 plots = {}
-plots['T1_gk'], = ax.plot([], [], 'go', markersize=8)
+plots['T1_gk'], = ax.plot([], [], 'ro', markersize=8)
 plots['T1_def'], = ax.plot([], [], 'ro', markersize=8)
-plots['T1_str1'], = ax.plot([], [], 'mo', markersize=8)
-plots['T1_str2'], = ax.plot([], [], 'mo', markersize=8)
-plots['T2_gk'], = ax.plot([], [], 'co', markersize=8)
+plots['T1_str1'], = ax.plot([], [], 'ro', markersize=8)
+plots['T1_str2'], = ax.plot([], [], 'ro', markersize=8)
+plots['T2_gk'], = ax.plot([], [], 'bo', markersize=8)
 plots['T2_def'], = ax.plot([], [], 'bo', markersize=8)
-plots['T2_str1'], = ax.plot([], [], 'yo', markersize=8)
-plots['T2_str2'], = ax.plot([], [], 'yo', markersize=8)
+plots['T2_str1'], = ax.plot([], [], 'bo', markersize=8)
+plots['T2_str2'], = ax.plot([], [], 'bo', markersize=8)
 
 # Ball
 ballPlot, = ax.plot([], [], 'm*', markersize=10)
