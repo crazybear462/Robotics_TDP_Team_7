@@ -35,9 +35,15 @@ class ForwardLeft (SoccerRobot):
         # print("RedForward - ballCoordinate: ", ballCoordinate)
         selfCoordinate = self.getSelfCoordinate()
         # print("RedForward - selfCoordinate: ", selfCoordinate)
-        rightForward = [data[33],data[34],data[35]]
-        redForward = [data[21],data[22],data[23]]
-        blueDef = [data[27],data[28],data[29]]
+        # print(data)
+        # print(len(data))
+        # rightForward = [data[33],data[34],data[35]]
+        # redForward = [data[21],data[22],data[23]]
+        # blueDef = [data[27],data[28],data[29]]
+
+        rightForward = [data[25], data[26], data[27]]
+        redForward = [data[13], data[14], data[15]]
+        blueDef = [data[19], data[20], data[21]]
 
         # Check the goal scored to balance itself.
         if self.checkGoal() == 1:

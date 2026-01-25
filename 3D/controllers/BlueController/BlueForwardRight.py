@@ -33,9 +33,17 @@ class ForwardRight (SoccerRobot):
         ballOwner = self.getBallOwner()
         ballCoordinate = self.getBallData()
         selfCoordinate = self.getSelfCoordinate()
-        leftForward = [data[30],data[31],data[32]]
-        redForward = [data[21],data[22],data[23]]
-        blueDef = [data[27],data[28],data[29]]
+        # print("RedForwardRight - selfCoordinate: ", selfCoordinate)
+        # print(data)
+        # print(len(data))
+        # leftForward = [data[30],data[31],data[32]]
+        # redForward = [data[21],data[22],data[23]]
+        # blueDef = [data[27],data[28],data[29]]
+        #
+
+        leftForward = [data[22],data[23],data[24]]
+        redForward = [data[13],data[14],data[15]]
+        blueDef = [data[19],data[20],data[21]]
 
         # Check the goal scored to balance itself.
         if self.checkGoal() == 1:

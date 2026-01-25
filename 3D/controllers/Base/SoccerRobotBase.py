@@ -140,7 +140,7 @@ class SoccerRobot:
   # -------------------------------------------------------------------
   def getBallData(self):
     # z not sent; keep standard ball height
-    return [self.ballX, self.ballY, 0.0798759]
+    return [self.ballX, self.ballY, 0.696782]
 
   def getBallOwner(self) -> str:
     return self.ballOwner

@@ -6,7 +6,7 @@ Assign roles based on robot name.
 from controller import Robot
 
 from RedGoalkeeper import Goalkeeper
-from RedDefenderLeft import SimpleCameraFollower
+from RedDefenderLeft import DefenderLeft
 from RedDefenderRight import DefenderRight
 from RedForward import Forward
 
@@ -18,7 +18,7 @@ print("[RED CTRL] robotName =", robotName)
 if robotName == "RED_GK":
     robotController = Goalkeeper(robot)
 elif robotName == "RED_DEF_L":
-    robotController = SimpleCameraFollower(robot)
+    robotController = DefenderLeft(robot)
 elif robotName == "RED_DEF_R":
     robotController = DefenderRight(robot)
 else:
