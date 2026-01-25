@@ -14,7 +14,7 @@ from controller import Supervisor
 
 class Defender (SoccerRobot):
   def run(self):
-    self.printSelf()
+    # self.printSelf()
     count_0=0
     flag = 0
     flag1 =0
@@ -29,9 +29,12 @@ class Defender (SoccerRobot):
         data = self.supervisorData
         ballOwner = self.getBallOwner()
         ballCoordinate = self.getBallData()
-        blue_fw_l = [data[30],data[31],data[32]]
-        blue_fw_r = [data[33],data[34],data[35]]
-        redFw = [data[21],data[22],data[23]]
+        blue_fw_l = [data[22],data[23],data[24]]
+        blue_fw_r = [data[25],data[26],data[27]]
+        redFw = [data[13],data[14],data[15]]
+        # blue_fw_l = [data[30],data[31],data[32]]
+        # blue_fw_r = [data[33],data[34],data[35]]
+        # redFw = [data[21],data[22],data[23]]
         # Get self coordinates
         selfCoordinate = self.getSelfCoordinate()
 

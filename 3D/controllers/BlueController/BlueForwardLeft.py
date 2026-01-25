@@ -34,9 +34,7 @@ class ForwardLeft (SoccerRobot):
         ballCoordinate = self.getBallData()
         # print("RedForward - ballCoordinate: ", ballCoordinate)
         selfCoordinate = self.getSelfCoordinate()
-        # print("RedForward - selfCoordinate: ", selfCoordinate)
-        # print(data)
-        # print(len(data))
+
         # rightForward = [data[33],data[34],data[35]]
         # redForward = [data[21],data[22],data[23]]
         # blueDef = [data[27],data[28],data[29]]

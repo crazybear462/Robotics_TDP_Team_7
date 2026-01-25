@@ -13,7 +13,7 @@ from Utils.Consts import (TIME_STEP, Motions)
 
 class Goalkeeper (SoccerRobot):
   def run(self):
-    self.printSelf()
+    # self.printSelf()
     flag = 0
     flag1 = 0
     flag2 = 0
@@ -31,10 +31,14 @@ class Goalkeeper (SoccerRobot):
         data = self.supervisorData
         ballOwner = self.getBallOwner()
         ballCoordinate = self.getBallData()
-        blue_fw_l = [data[30],data[31],data[32]]
-        blue_fw_r = [data[33],data[34],data[35]]
-        redFw = [data[21],data[22],data[23]]
-        blueDef = [data[27],data[28],data[29]]
+        blue_fw_l = [data[22], data[23], data[24]]
+        blue_fw_r = [data[25], data[26], data[27]]
+        redFw = [data[13], data[14], data[15]]
+        blueDef = [data[19], data[20], data[21]]
+        # blue_fw_l = [data[32],data[31],data[32]]
+        # blue_fw_r = [data[33],data[34],data[35]]
+        # redFw = [data[21],data[22],data[23]]
+        # blueDef = [data[27],data[28],data[29]]
         # Get self coordinates
         selfCoordinate = self.getSelfCoordinate()
 
