@@ -1,31 +1,25 @@
-Webots Project File version R2025a
-perspectives: 000000ff00000000fd00000003000000000000000000000000fc0100000001fb0000001a0044006f00630075006d0065006e0074006100740069006f006e0000000000ffffffff0000000000000000000000010000013d000002ddfc0200000001fb0000001400540065007800740045006400690074006f00720100000000000002dd0000004500ffffff000000030000062c00000121fc0100000001fb0000001a0043006f006e0073006f006c00650041006c006c0041006c006c01000000000000062c0000008700ffffff000004ed000002dd00000001000000020000000100000008fc00000000
-simulationViewPerspectives: 000000ff000000010000000200000147000002aa0100000002010000000100
-sceneTreePerspectives: 000000ff00000001000000030000001e000002f4000000fa0100000002010000000200
+Webots Project File version R2023b
+perspectives: 000000ff00000000fd0000000200000001000001ee000002d1fc0200000001fb0000001400540065007800740045006400690074006f0072010000001a000002d10000004200ffffff0000000300000780000000d9fc0100000001fb0000001a0043006f006e0073006f006c00650041006c006c0041006c006c0100000000000007800000006900ffffff00000590000002d100000001000000020000000100000008fc00000000
+simulationViewPerspectives: 000000ff000000010000000200000110000005520100000002010000000100
+sceneTreePerspectives: 000000ff000000010000000300000022000000c0000000fa0100000002010000000200
 maximizedDockId: -1
 centralWidgetVisible: 1
-projectionMode: PERSPECTIVE
 orthographicViewHeight: 1
 textFiles: -1
-globalOptionalRendering: CameraFrustums
 consoles: Console:All:All
-renderingDevicePerspectives: NAO BLUE 0:CameraBottom;1;0.266667;0;0
-renderingDevicePerspectives: NAO BLUE 0:CameraTop;1;0.266667;0;0
-renderingDevicePerspectives: NAO BLUE 1:CameraBottom;1;0.266667;0;0.245308
-renderingDevicePerspectives: NAO BLUE 1:CameraTop;1;0.266667;0;0
-renderingDevicePerspectives: NAO BLUE 2:CameraBottom;0;0.266667;0;0.211796
-renderingDevicePerspectives: NAO BLUE 2:CameraTop;1;0.266667;0;0.398123
-renderingDevicePerspectives: NAO BLUE 4:CameraBottom;1;0.266667;0.331378;0.0649259
-renderingDevicePerspectives: NAO BLUE 4:CameraTop;1;0.266667;0.108504;0.110397
-renderingDevicePerspectives: NAO RED 0:CameraBottom;1;1;0;0
-renderingDevicePerspectives: NAO RED 0:CameraTop;1;1;0;0
-renderingDevicePerspectives: NAO RED 1:CameraBottom;1;1;0;0
-renderingDevicePerspectives: NAO RED 1:CameraTop;1;1;0;0
-renderingDevicePerspectives: NAO RED 3:CameraBottom;1;1;0;0
-renderingDevicePerspectives: NAO RED 3:CameraTop;1;1;0;0
-renderingDevicePerspectives: NAO RED 4:CameraBottom;1;0.266667;0;0.588472
-renderingDevicePerspectives: NAO RED 4:CameraTop;1;0.266667;0;0.572386
+renderingDevicePerspectives: BLUE_DEF:CameraBottom;1;1;0;0
+renderingDevicePerspectives: BLUE_DEF:CameraTop;1;1;0;0
+renderingDevicePerspectives: BLUE_FW_L:CameraBottom;1;1;0;0
+renderingDevicePerspectives: BLUE_FW_L:CameraTop;1;1;0;0
+renderingDevicePerspectives: BLUE_FW_R:CameraBottom;1;1;0.0125;0.24431
+renderingDevicePerspectives: BLUE_FW_R:CameraTop;1;1;0;0
+renderingDevicePerspectives: BLUE_GK:CameraBottom;1;1;0;0
+renderingDevicePerspectives: BLUE_GK:CameraTop;1;1;0;0
 renderingDevicePerspectives: RED_DEF_L:CameraBottom;1;1;0;0
 renderingDevicePerspectives: RED_DEF_L:CameraTop;1;1;0;0
-renderingDevicePerspectives: RED_DEF_R:CameraBottom;1;1;0.187333;0.0133729
-renderingDevicePerspectives: RED_DEF_R:CameraTop;1;0.650347;0.514194;0.0341753
+renderingDevicePerspectives: RED_DEF_R:CameraBottom;1;1;0;0
+renderingDevicePerspectives: RED_DEF_R:CameraTop;1;1;0;0
+renderingDevicePerspectives: RED_FW:CameraBottom;1;1;0;0
+renderingDevicePerspectives: RED_FW:CameraTop;1;1;0;0
+renderingDevicePerspectives: RED_GK:CameraBottom;1;1;0;0
+renderingDevicePerspectives: RED_GK:CameraTop;1;1;0;0

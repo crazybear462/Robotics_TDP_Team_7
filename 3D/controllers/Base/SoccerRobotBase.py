@@ -96,7 +96,7 @@ class SoccerRobot:
     if not self.receiver or self.receiver.getQueueLength() == 0:
       return False
 
-    raw = self.receiver.getData()
+    raw = self.receiver.getBytes()
 
     # MUST match SupervisorBase: struct.pack('dd9ss24d', ...)
     # dd = ballX, ballY
