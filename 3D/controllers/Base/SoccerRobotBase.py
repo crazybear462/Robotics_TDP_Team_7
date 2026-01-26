@@ -219,18 +219,32 @@ class SoccerRobot:
       self.currentlyMoving = None
 
   def isNewMotionValid(self, decidedMotion) -> bool:
-    # Allow switching if motion differs, or current motion is over
-    if decidedMotion is None:
-      return False
-    if not self.currentlyMoving:
-      return True
-    try:
-      if self.currentlyMoving.name != decidedMotion.name:
-        return True
-      # same motion: only valid if over
-      return self.currentlyMoving.isOver()
-    except Exception:
-      return True
+      if decidedMotion is None:
+          return False
+
+      # --- cooldown for turn motions (prevents spam & falling) ---
+      if not hasattr(self, "_turn_cooldown"):
+          self._turn_cooldown = 0
+      if self._turn_cooldown > 0:
+          self._turn_cooldown -= 1
+          # block repeated turnRight40/turnLeft40 while cooling down
+          if decidedMotion.name in ["turnRight40", "turnLeft40"]:
+              return False
+
+      if not self.currentlyMoving:
+          # start cooldown only when we actually start a turn
+          if decidedMotion.name in ["turnRight40", "turnLeft40"]:
+              self._turn_cooldown = int(0.8 * 1000 / TIME_STEP)  # ~0.8s
+          return True
+
+      try:
+          if self.currentlyMoving.name != decidedMotion.name:
+              if decidedMotion.name in ["turnRight40", "turnLeft40"]:
+                  self._turn_cooldown = int(0.8 * 1000 / TIME_STEP)
+              return True
+          return self.currentlyMoving.isOver()
+      except Exception:
+          return True
 
   def startMotion(self):
     if not self.motionQueue:
