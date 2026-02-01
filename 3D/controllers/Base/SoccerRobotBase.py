@@ -12,6 +12,14 @@ from abc import ABC, abstractmethod
 from controller import (Motion, InertialUnit)
 import struct
 from Utils.Consts import (TIME_STEP, Motions)
+import math
+from Utils import Functions
+
+# Collision avoidance constants
+COLLISION_DISTANCE_THRESHOLD = 0.5   # meters - start avoidance when closer than this
+COLLISION_DISTANCE_CRITICAL = 0.3    # meters - immediate stop and step back
+COLLISION_COOLDOWN_STEPS = 30        # timesteps to hold avoidance motion before re-checking
+
 
 class SoccerRobot(ABC):
   def __init__(self, robot):
@@ -70,6 +78,11 @@ class SoccerRobot(ABC):
     self.currentlyMoving = False
     self.motionQueue = [self.motions.standInit]
     self.startMotion()
+
+    # --- Collision Avoidance State ---
+    self.collisionAvoidanceEnabled = True
+    self.isAvoiding = False
+    self.avoidanceCooldown = 0
 
   @abstractmethod
   def decideMotion(self, ballCoordinate, selfCoordinate) -> Motion:
@@ -241,6 +254,161 @@ class SoccerRobot(ABC):
 
     return True
 
+  def findClosestRobot(self) -> tuple:
+      """Return (minDistance, closestName, closestPos)."""
+      selfCoord = self.getSelfCoordinate()
+      allPositions = self.getAllRobotPositions()
+      if not allPositions:
+          return (None, None, None)
+
+      minDistance = float("inf")
+      closestName = None
+      closestPos = None
+
+      for rName, rPos in allPositions.items():
+          # IMPORTANT: only works if your robot.getName() returns these exact strings
+          if rName == self.name:
+              continue
+
+          dist = Functions.calculateDistance(selfCoord, rPos)  # uses x,y
+          if dist < minDistance:
+              minDistance = dist
+              closestName = rName
+              closestPos = rPos
+
+      return (minDistance, closestName, closestPos)
+
+  def getAllRobotPositions(self) -> dict:
+      """Extract all robot positions from supervisor data."""
+      if self.supervisorData is None:
+          return {}
+
+      positions = {}
+
+      # Supervisor packs 24 doubles for robot positions after index 12:
+      # 8 robots * (x,y,z) = 24 doubles
+      baseIndex = 12
+      robotNames = [
+          "RED_GK", "RED_DEF_L", "RED_DEF_R", "RED_FW",
+          "BLUE_GK", "BLUE_DEF", "BLUE_FW_L", "BLUE_FW_R"
+      ]
+
+      for i, rName in enumerate(robotNames):
+          idx = baseIndex + i * 3
+          positions[rName] = [
+              self.supervisorData[idx],
+              self.supervisorData[idx + 1],
+              self.supervisorData[idx + 2]
+          ]
+
+      return positions
+
+  def getAvoidanceMotion(self, opponentPosition) -> Motion:
+      """Choose an avoidance motion away from opponent."""
+      selfCoord = self.getSelfCoordinate()
+      robotHeading = self.getRollPitchYaw()[2]  # yaw (radians)
+
+      relativeAngle = Functions.calculateRelativeAngle(opponentPosition, selfCoord, robotHeading)
+      # + angle = opponent on left, - angle = on right
+
+      if abs(relativeAngle) > 120:
+          # opponent behind -> go forward
+          return self.motions.forwards50 if hasattr(self.motions, "forwards50") else self.motions.forwardsSprint
+      elif abs(relativeAngle) < 30:
+          # opponent ahead -> go backwards
+          return self.motions.backwards if hasattr(self.motions, "backwards") else self.motions.standInit
+      elif relativeAngle > 0:
+          # opponent left -> step right
+          return self.motions.sideStepRight
+      else:
+          # opponent right -> step left
+          return self.motions.sideStepLeft
+
+  def getAvoidanceTurnMotion(self, opponentPosition) -> Motion:
+      """Optional: turn away after sidestep."""
+      selfCoord = self.getSelfCoordinate()
+      robotHeading = self.getRollPitchYaw()[2]
+      relativeAngle = Functions.calculateRelativeAngle(opponentPosition, selfCoord, robotHeading)
+
+      if abs(relativeAngle) > 120 or abs(relativeAngle) < 10:
+          return None
+
+      # Turn away from opponent
+      if relativeAngle > 0:
+          # opponent on left -> turn right
+          return self.motions.turnRight60 if abs(relativeAngle) > 50 else self.motions.turnRight40
+      else:
+          # opponent on right -> turn left
+          return self.motions.turnLeft60 if abs(relativeAngle) > 50 else self.motions.turnLeft30
+
+  def checkCollisionAvoidance(self) -> bool:
+      """Main check: if collision risk, enqueue avoidance and return True."""
+      if not self.collisionAvoidanceEnabled:
+          return False
+
+      # cooldown
+      if self.avoidanceCooldown > 0:
+          self.avoidanceCooldown -= 1
+          return True
+
+      # if currently avoiding, wait until motion done
+      if self.isAvoiding:
+          if self.currentlyMoving and not self.currentlyMoving.isOver():
+              return True
+          self.isAvoiding = False
+
+      minDist, closestName, closestPos = self.findClosestRobot()
+      if minDist is None:
+          return False
+
+      print(f"[{self.name}] closest={closestName} dist={minDist:.3f}")
+
+      # critical
+      if minDist < COLLISION_DISTANCE_CRITICAL:
+          self.interruptMotion()
+          self.clearMotionQueue()
+          self.isAvoiding = True
+          self.avoidanceCooldown = COLLISION_COOLDOWN_STEPS
+
+          avoidMotion = self.getAvoidanceMotion(closestPos)
+          self.addMotionToQueue(avoidMotion)
+
+          turnMotion = self.getAvoidanceTurnMotion(closestPos)
+          if turnMotion is not None:
+              self.addMotionToQueue(turnMotion)
+
+          # move away a bit
+          if hasattr(self.motions, "forwards50"):
+              self.addMotionToQueue(self.motions.forwards50)
+          else:
+              self.addMotionToQueue(self.motions.forwardsSprint)
+
+          self.startMotion()
+          return True
+
+      # warning
+      if minDist < COLLISION_DISTANCE_THRESHOLD:
+          print(f"[{self.name}] AVOID_TRIGGER dist={minDist:.3f}")
+
+          if self.currentlyMoving == False or self.currentlyMoving.isOver():
+              self.isAvoiding = True
+              self.avoidanceCooldown = COLLISION_COOLDOWN_STEPS // 2
+              self.clearMotionQueue()
+
+              avoidMotion = self.getAvoidanceMotion(closestPos)
+              self.addMotionToQueue(avoidMotion)
+              self.startMotion()
+              return True
+
+      return False
+
+  def setCollisionAvoidanceEnabled(self, enabled: bool) -> None:
+      self.collisionAvoidanceEnabled = enabled
+
+  def runCollisionAvoidanceStep(self) -> bool:
+      """Call this every timestep in each robot run() before decideMotion."""
+      return self.checkCollisionAvoidance()
+
   def getTurningMotion(self, turningAngle):
     """Decide the motion according to the turning angle.
 
@@ -263,3 +431,4 @@ class SoccerRobot(ABC):
       return self.motions.turnRight40
     else:
       return None
+

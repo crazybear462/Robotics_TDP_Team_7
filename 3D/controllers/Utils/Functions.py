@@ -25,6 +25,9 @@ def calculateAngleAccordingToXAxis(ballCoordinate, robotCoordinate) -> float:
       float: Angle between robot-ball vector and x-axis.
   """
   hypot = calculateDistance(ballCoordinate, robotCoordinate)
+  if hypot < 0.001:
+      return 0.0
+
   deltaX = math.fabs(ballCoordinate[0] - robotCoordinate[0])
 
   cosTheta = deltaX / hypot
@@ -96,3 +99,18 @@ def calculateTurningAngleAccordingToRobotHeading(ballCoordinate, robotCoordinate
   # print(turningAngle)
 
   return turningAngle
+
+def calculateAngleToTarget(targetCoordinate, robotCoordinate) -> float:
+  dx = targetCoordinate[0] - robotCoordinate[0]
+  dy = targetCoordinate[1] - robotCoordinate[1]
+  return math.degrees(math.atan2(dy, dx))
+
+def calculateRelativeAngle(targetCoordinate, robotCoordinate, robotHeadingAngle) -> float:
+  absoluteAngle = calculateAngleToTarget(targetCoordinate, robotCoordinate)
+  headingDeg = math.degrees(robotHeadingAngle)
+  relativeAngle = absoluteAngle - headingDeg
+  if relativeAngle > 180:
+    relativeAngle -= 360
+  elif relativeAngle < -180:
+    relativeAngle += 360
+  return relativeAngle
