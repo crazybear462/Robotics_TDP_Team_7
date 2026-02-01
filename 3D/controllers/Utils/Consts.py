@@ -64,6 +64,7 @@ class Motions:
         self.turnLeft180 = MotionBase('turnLeft180', '../../motions/TurnLeft180.motion')
         self.turnRight10 = MotionBase('turnRight10', '../../motions/TurnRight10.motion')
         self.turnRight10_V2 = MotionBase('turnRight10_V2', '../../motions/TurnRight10_V2.motion')
+        self.turnRight30 = MotionBase('turnRight30', '../../motions/TurnRight30.motion')
         self.turnRight40 = MotionBase('turnRight40', '../../motions/TurnRight40.motion')
         self.turnRight60 = MotionBase('turnRight60', '../../motions/TurnRight60.motion')
         self.standInit = MotionBase('standInit', '../../motions/StandInit.motion')

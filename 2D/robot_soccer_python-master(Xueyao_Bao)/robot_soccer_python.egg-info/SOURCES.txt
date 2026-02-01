@@ -1,0 +1,17 @@
+LICENSE.txt
+README.md
+setup.cfg
+setup.py
+robot_soccer_python/__init__.py
+robot_soccer_python/agents.py
+robot_soccer_python/constants.py
+robot_soccer_python/simulation.py
+robot_soccer_python/simulation2D.py
+robot_soccer_python/state_machine_ball.py
+robot_soccer_python/test.py
+robot_soccer_python/utils.py
+robot_soccer_python.egg-info/PKG-INFO
+robot_soccer_python.egg-info/SOURCES.txt
+robot_soccer_python.egg-info/dependency_links.txt
+robot_soccer_python.egg-info/requires.txt
+robot_soccer_python.egg-info/top_level.txt

@@ -1,307 +1,265 @@
 """
-SoccerRobotBase (FIXED):
-- Receives Supervisor binary packets via Receiver.getData()
-- Unpacks struct 'dd9ss24d' exactly as SupervisorBase sends
-- Provides motions + queue helpers used by your Defender code
+The Basic Robot behaviour and feature class.
+All robots should be derived from this class.
 """
 
+import os, sys
+currentdir = os.path.dirname(os.path.realpath(__file__))
+parentdir = os.path.dirname(currentdir)
+sys.path.append(parentdir)
+
+from abc import ABC, abstractmethod
+from controller import (Motion, InertialUnit)
 import struct
-import math
-from controller import Robot
+from Utils.Consts import (TIME_STEP, Motions)
 
-from Utils.Consts import TIME_STEP, Motions
-
-
-MAX_SONAR = 2.55  # your code checks 2.55 meaning "no obstacle"
-
-
-class SoccerRobot:
-  def __init__(self, robot: Robot):
+class SoccerRobot(ABC):
+  def __init__(self, robot):
     self.robot = robot
-    self.robotName = self.robot.getName()
+    self.name = robot.getName()
 
-    # -----------------------
-    # Motions / queue
-    # -----------------------
-    self.motions = Motions()
-    self.motionQueue = []
-    self.currentlyMoving = None
+    self.supervisorData = None
 
-    # -----------------------
-    # Sensors / devices
-    # -----------------------
-    self.receiver = self._get_device_any(["receiver", "Receiver", "ball_receiver"])
-    self.receiver = self._get_device_any(["receiver", "Receiver", "ball_receiver"])
+    # GPS
+    self.gps = robot.getDevice("gps")
+    self.gps.enable(TIME_STEP)
 
-    if self.receiver:
-      self.receiver.enable(TIME_STEP)
-      try:
-        self.receiver.setChannel(0)
-      except Exception:
-        pass
+    # Receiver
+    self.receiver = robot.getDevice("receiver")
+    self.receiver.enable(TIME_STEP)
 
-    # inertial unit for yaw
-    self.imu = self._get_device_any(["inertial unit", "inertialUnit", "imu"])
-    if self.imu:
-      try:
-        self.imu.enable(TIME_STEP)
-      except Exception:
-        pass
+    # Emitter
+    self.emitter = robot.getDevice("emitter")
 
-    # Sonars (try common names; if not found we return MAX_SONAR)
-    self.sonarLeft = self._get_device_any(["Sonar/Left", "sonar_left", "left sonar", "US/Left", "us_left"])
-    self.sonarRight = self._get_device_any(["Sonar/Right", "sonar_right", "right sonar", "US/Right", "us_right"])
-    for s in [self.sonarLeft, self.sonarRight]:
-      if s:
-        try:
-          s.enable(TIME_STEP)
-        except Exception:
-          pass
+    # InertialUnit
+    self.inertialUnit = robot.getDevice("inertial unit")
+    self.inertialUnit.enable(TIME_STEP)
 
+    # Ultrasound Sensors
+    self.ultrasound = []
+    self.ultrasound.append(robot.getDevice("Sonar/Left"))
+    self.ultrasound.append(robot.getDevice("Sonar/Right"))
+    self.ultrasound[0].enable(TIME_STEP)
+    self.ultrasound[1].enable(TIME_STEP)
+
+    # Obstacle Avoidance Option
     self.obstacleAvoidance = True
 
-    # -----------------------
-    # Latest supervisor data
-    # -----------------------
-    self.supervisorData = None
-    self.ballX = 0.0
-    self.ballY = 0.0
-    self.ballOwner = "N"
-    self.ballPriority = "N"
-    self.lastPacketTime = -1.0
+    # Foot Bumpers
+    self.bumpers = {
+      "bumperLL": robot.getDevice('LFoot/Bumper/Left'),
+      "bumperLR": robot.getDevice('LFoot/Bumper/Right'),
+      "bumperRL": robot.getDevice('RFoot/Bumper/Left'),
+      "bumperRR": robot.getDevice('RFoot/Bumper/Right')
+    }
 
-    # cached robot positions from packet
-    self.robotPos = {}
+    self.bumpers["bumperLL"].enable(TIME_STEP)
+    self.bumpers["bumperLR"].enable(TIME_STEP)
+    self.bumpers["bumperRL"].enable(TIME_STEP)
+    self.bumpers["bumperRR"].enable(TIME_STEP)
 
-  # -------------------------------------------------------------------
-  # Device helper
-  # -------------------------------------------------------------------
-  def _get_device_any(self, names):
-    for n in names:
-      try:
-        d = self.robot.getDevice(n)
-        if d:
-          return d
-      except Exception:
-        pass
-    return None
+    # Camera
+    self.cameraTop = robot.getDevice("CameraTop")
+    self.cameraBottom = robot.getDevice("CameraBottom")
+    self.cameraTop.enable(TIME_STEP)
+    self.cameraBottom.enable(TIME_STEP)
 
-  # -------------------------------------------------------------------
-  # Supervisor packet handling (CRITICAL FIX)
-  # -------------------------------------------------------------------
+    # Load motion files
+    self.motions = Motions()
+
+    self.currentlyMoving = False
+    self.motionQueue = [self.motions.standInit]
+    self.startMotion()
+
+  @abstractmethod
+  def decideMotion(self, ballCoordinate, selfCoordinate) -> Motion:
+    """Returns the next motion of the robot according to the role.
+
+    Args:
+        ballCoordinate (list): x, y, z coordinates of the ball.
+        selfCoordinate (list): x, y coordinates of the robot.
+
+    Returns:
+        Motion: Decided motion.
+    """
+    pass
+
+  def printSelf(self) -> None:
+    print("Hello! This is robot ", self.name)
+
+  def getSelfCoordinate(self) -> list:
+    """Get the robot coordinate on the field.
+
+    Returns:
+        list: x, y coordinates.
+    """
+    gps_values = self.gps.getValues()
+    return [gps_values[0], gps_values[1], gps_values[2]]
+
+  def getRollPitchYaw(self) -> list:
+    """Get the Roll, Pitch and Yaw angles of robot.
+
+    Returns:
+        list: Roll, Pitch and Yaw angles.
+    """
+    return self.inertialUnit.getRollPitchYaw()
+
   def isNewBallDataAvailable(self) -> bool:
-    return bool(self.receiver) and self.receiver.getQueueLength() > 0
+    """Check if there is a new ball data available.
 
-  def getSupervisorData(self) -> bool:
-    if not self.receiver or self.receiver.getQueueLength() == 0:
-      return False
+    Returns:
+        bool: Is there any new ball data available?
+    """
+    return self.receiver.getQueueLength() > 0
 
-    raw = self.receiver.getBytes()
-
-    # MUST match SupervisorBase: struct.pack('dd9ss24d', ...)
-    # dd = ballX, ballY
-    # 9s = ballOwner (padded with *)
-    # s  = ballPriority
-    # 24d = 8 robots * 3 coords
-    try:
-      unpacked = struct.unpack("dd9ss24d", raw)
-    except Exception:
-      # if packet size mismatched, drop it
-      self.receiver.nextPacket()
-      return False
-
-    self.ballX = unpacked[0]
-    self.ballY = unpacked[1]
-
-    self.ballOwner = unpacked[2].decode("utf-8", errors="ignore").replace("*", "").strip()
-    self.ballPriority = unpacked[3].decode("utf-8", errors="ignore").strip()
-
-    doubles = unpacked[4:]  # 24 doubles
-
-    order = [
-      "RED_GK", "RED_DEF_L", "RED_DEF_R", "RED_FW",
-      "BLUE_GK", "BLUE_DEF", "BLUE_FW_L", "BLUE_FW_R"
-    ]
-
-    self.robotPos = {}
-    k = 0
-    for name in order:
-      self.robotPos[name] = [doubles[k], doubles[k + 1], doubles[k + 2]]
-      k += 3
-
-    self.supervisorData = list(unpacked)
-    self.lastPacketTime = self.robot.getTime()
-
+  def getSupervisorData(self) -> None:
+    """Get the latest supervisor data.
+    """
+    message = self.receiver.getBytes()
+    self.supervisorData = struct.unpack('dd9cc24d', message)
     self.receiver.nextPacket()
-    return True
 
-  # -------------------------------------------------------------------
-  # Getters used by your behaviour scripts
-  # -------------------------------------------------------------------
-  def getBallData(self):
-    # z not sent; keep standard ball height
-    return [self.ballX, self.ballY, 0.696782]
+  def getBallData(self) -> list:
+    """Get the latest coordinates of the ball and robots.
+
+    Returns:
+        list: x, y coordinates.
+    """
+
+    return [self.supervisorData[0], self.supervisorData[1]]
+
+  def getLeftSonarValue(self) -> float:
+    """Get the left sonar distance.
+
+    Returns:
+        float: Distance (0 - 2.55)
+    """
+
+    return self.ultrasound[0].getValue()
+
+  def getRightSonarValue(self) -> float:
+    """Get the right sonar distance.
+
+    Returns:
+        float: Distance (0 - 2.55)
+    """
+
+    return self.ultrasound[1].getValue()
 
   def getBallOwner(self) -> str:
-    return self.ballOwner
+    """Get the ball owner team player.
+
+    Returns:
+        str: Ball owner team player.
+    """
+    ballOwner = ''
+    for i in range(2, 11):
+      ballOwner = ballOwner + self.supervisorData[i].decode('utf-8')
+
+    return ballOwner.strip('*')
 
   def getBallPriority(self) -> str:
-    return self.ballPriority
+    """Get the ball prior team first letter.
 
-  def getSelfCoordinate(self):
-    # name mapping: your world uses RED_DEF_R etc
-    if self.robotName in self.robotPos:
-      return self.robotPos[self.robotName]
-    # fallback (if name differs)
-    return [0.0, 0.0, 0.33]
+    Returns:
+        str: Ball prior team first letter.
+    """
 
-  def getLeftSonarValue(self):
-    if not self.sonarLeft:
-      return MAX_SONAR
-    try:
-      return self.sonarLeft.getValue()
-    except Exception:
-      return MAX_SONAR
+    return self.supervisorData[11].decode('utf-8')
 
-  def getRightSonarValue(self):
-    if not self.sonarRight:
-      return MAX_SONAR
-    try:
-      return self.sonarRight.getValue()
-    except Exception:
-      return MAX_SONAR
+  def checkGoal(self) -> int:
+    """Check if the goal scored.
 
-  def getRollPitchYaw(self):
-    if not self.imu:
-      return (0.0, 0.0, 0.0)
-    try:
-      rpy = self.imu.getRollPitchYaw()
-      return (rpy[0], rpy[1], rpy[2])
-    except Exception:
-      return (0.0, 0.0, 0.0)
+    Returns:
+        int: Returns 1 if the goal scored by the team,
+                     -1 if the goal scored by the oponent,
+                      0 otherwise.
+    """
+    ballCoordinate = self.getBallData()
+    if abs(ballCoordinate[0]) > 4.5 and abs(ballCoordinate[1]) < 1.35:
+      if 4.5 < ballCoordinate[0]:
+        if self.name[0] == "R":
+          return 1
+        else:
+          return -1
 
-  # -------------------------------------------------------------------
-  # Goal check (simple, field centered at 0, x in [-4.5, +4.5])
-  # return:  1 => my team scored, -1 => conceded, 0 => none
-  # -------------------------------------------------------------------
-  def checkGoal(self):
-    bx, by = self.ballX, self.ballY
-    GOAL_X = 4.5
-    GOAL_HALF_Y = 1.3  # goal width 2.6
-
-    is_red = self.robotName.startswith("RED")
-
-    if bx > (GOAL_X - 0.05) and abs(by) <= GOAL_HALF_Y:
-      # ball in BLUE goal (right side) => RED scored
-      return 1 if is_red else -1
-
-    if bx < (-GOAL_X + 0.05) and abs(by) <= GOAL_HALF_Y:
-      # ball in RED goal (left side) => BLUE scored
-      return -1 if is_red else 1
+      else:
+        if self.name[0] == "B":
+          return 1
+        else:
+          return -1
 
     return 0
 
-  # -------------------------------------------------------------------
-  # Motion queue helpers (matches your Defender style)
-  # -------------------------------------------------------------------
-  def clearMotionQueue(self):
-    self.motionQueue = []
+  def interruptMotion(self) -> None:
+    """Interrupt if the robot is moving.
+    """
+    if self.currentlyMoving:
+      self.currentlyMoving.stop()
+      self.currentlyMoving = False
 
-  def addMotionToQueue(self, motion):
+  def interruptForwardsSprint(self) -> None:
+    """Interrupt if the robot is moving forward.
+    """
+    if self.currentlyMoving and self.currentlyMoving.name == "forwardsSprint" and self.currentlyMoving.getTime() == 1360:  # we reached the end of forward.motion
+      self.currentlyMoving.stop()
+      self.currentlyMoving = False
+
+  def startMotion(self) -> None:
+    """Start a motion from the queue if the previous one completed.
+    """
+    if self.currentlyMoving == False or self.currentlyMoving.isOver():
+      if len(self.motionQueue) > 0:
+        currentMotion = self.motionQueue.pop(0)
+        currentMotion.play()
+        self.currentlyMoving = currentMotion
+
+  def addMotionToQueue(self, motion) -> None:
+    """Add the next motion of the robot to the queue.
+
+    Args:
+        motion (Motion): Loaded motion variable.
+    """
     self.motionQueue.append(motion)
 
-  def interruptMotion(self):
-    if self.currentlyMoving:
-      try:
-        self.currentlyMoving.stop()
-      except Exception:
-        pass
-      self.currentlyMoving = None
+  def clearMotionQueue(self) -> None:
+    """Clear the motion queue.
+    """
+    self.motionQueue.clear()
 
-  def isNewMotionValid(self, decidedMotion) -> bool:
-      if decidedMotion is None:
-          return False
+  def isNewMotionValid(self, newMotion) -> bool:
+    """Compare the new motion and current motion.
 
-      # --- cooldown for turn motions (prevents spam & falling) ---
-      if not hasattr(self, "_turn_cooldown"):
-          self._turn_cooldown = 0
-      if self._turn_cooldown > 0:
-          self._turn_cooldown -= 1
-          # block repeated turnRight40/turnLeft40 while cooling down
-          if decidedMotion.name in ["turnRight40", "turnLeft40"]:
-              return False
+    Args:
+        newMotion (Motion): New motion
 
-      if not self.currentlyMoving:
-          # start cooldown only when we actually start a turn
-          if decidedMotion.name in ["turnRight40", "turnLeft40"]:
-              self._turn_cooldown = int(0.8 * 1000 / TIME_STEP)  # ~0.8s
-          return True
+    Returns:
+        bool: Is the new motion valid?
+    """
+    if newMotion == None or (self.currentlyMoving != False and self.currentlyMoving.isOver() != True and newMotion.name == self.currentlyMoving.name):
+      return False
 
-      try:
-          if self.currentlyMoving.name != decidedMotion.name:
-              if decidedMotion.name in ["turnRight40", "turnLeft40"]:
-                  self._turn_cooldown = int(0.8 * 1000 / TIME_STEP)
-              return True
-          return self.currentlyMoving.isOver()
-      except Exception:
-          return True
+    return True
 
-  def startMotion(self):
-    if not self.motionQueue:
-      return
+  def getTurningMotion(self, turningAngle):
+    """Decide the motion according to the turning angle.
 
-    next_motion = self.motionQueue[0]
+    Args:
+        turningAngle (double): Turning angle in degrees.
 
-    # If nothing playing -> play
-    if not self.currentlyMoving:
-      self.currentlyMoving = next_motion
-      try:
-        self.currentlyMoving.play()
-      except Exception:
-        pass
-      return
-
-    # If different motion requested -> stop current and play next
-    try:
-      if self.currentlyMoving.name != next_motion.name:
-        try:
-          self.currentlyMoving.stop()
-        except Exception:
-          pass
-        self.currentlyMoving = next_motion
-        self.currentlyMoving.play()
-        return
-
-      # Same motion requested: if over, replay
-      if self.currentlyMoving.isOver():
-        self.currentlyMoving.play()
-    except Exception:
-      # if anything weird, try to play next
-      self.currentlyMoving = next_motion
-      try:
-        self.currentlyMoving.play()
-      except Exception:
-        pass
-
-  # -------------------------------------------------------------------
-  # Turning motion helper (used by Defender strategies)
-  # -------------------------------------------------------------------
-  def getTurningMotion(self, turningAngleDeg):
-    a = turningAngleDeg
-    if a is None:
-      return None
-    if abs(a) < 10:
-      return None
-    if a > 120:
-      return self.motions.turnLeft180
-    if a > 50:
+    Returns:
+        Motion: Decided motion.
+    """
+    # print(self.name, turningAngle)
+    # if turningAngle > 20:
+    #   return self.motions.turnLeft20
+    if turningAngle > 50:
       return self.motions.turnLeft60
-    if a > 25:
-      return self.motions.turnLeft40
-    if a < -120:
-      return self.motions.turnLeft180  # your set doesn’t have Right180, keep left180
-    if a < -50:
+    elif turningAngle > 20:
+      return self.motions.turnLeft30
+    elif turningAngle < -50:
       return self.motions.turnRight60
-    if a < -25:
+    elif turningAngle < -30:
       return self.motions.turnRight40
-    return None
+    else:
+      return None
