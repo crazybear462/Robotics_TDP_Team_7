@@ -33,6 +33,31 @@ def calculateAngleAccordingToXAxis(ballCoordinate, robotCoordinate) -> float:
 
   return degree
 
+def getDistanceFromLine(start_point, end_point, point_to_check):
+    "This function will check how far a point is from a line"
+    # 1. Create the vector for the line (Goal - Start)
+    # Hint: Subtract start_point from end_point
+    line_vec_x = end_point[0] - start_point[0]
+    line_vec_y = end_point[1] - start_point[1]
+
+    # 2. Create the vector to the point (Opponent - Start)
+    point_vec_x = point_to_check[0] - start_point[0]
+    point_vec_y = point_to_check[1] - start_point[1]
+
+    # 3. Calculate the Cross Product (2D)
+    # Formula: (A_x * B_y) - (A_y * B_x)
+    cross_product = (line_vec_x * point_vec_y) - (line_vec_y * point_vec_x)
+
+    # 4. Calculate the length of the line vector (The Base)
+    line_len = math.sqrt(line_vec_x ** 2 + line_vec_y ** 2)
+
+    # 5. Calculate Height (Area / Base)
+    # We use abs() because distance cannot be negative
+    distance = abs(cross_product) / line_len
+
+    return distance
+    pass
+
 def calculateBallRegion(ballCoordinate, robotCoordinate) -> int:
   """ Ball region is the region of the ball according to robot.
       We assumed the robot as origin of coordinate system.
