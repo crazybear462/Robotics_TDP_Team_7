@@ -10,7 +10,6 @@ import BlueTeamStrategies
 
 
 class Defender(SoccerRobot):
-
   # ----------------------------
   # helper: crowd detection around ball (collision avoidance)
   # ----------------------------
@@ -51,30 +50,60 @@ class Defender(SoccerRobot):
     if self.currentlyMoving and self.currentlyMoving.name == "forwardsSprint" and self.currentlyMoving.getTime() == 1360:
       self.currentlyMoving.setTime(360)
 
-  # ✅ FIXED: Sidestep FIRST when |y_diff| <= 1 (no turning)
-  def _track_ball_y(self, target_x, ball_y, selfCoordinate):
+  # ==========================================================
+  # Stand-up helpers (FIX: avoid double-trigger of standUpFromFront)
+  # ==========================================================
+  def _is_standup_motion(self, m):
+    return (m is not False) and (m is not None) and hasattr(m, "name") and ("standUp" in m.name or "StandUp" in m.name)
+
+  def _standup_tick(self):
+    if not hasattr(self, "_standup_cooldown"):
+      self._standup_cooldown = 0
+    if self._standup_cooldown > 0:
+      self._standup_cooldown -= 1
+
+  # ==========================================================
+  # ADDED: Face-ball gate (run this before any other action)
+  # ==========================================================
+  def _face_ball_first(self, ballCoordinate, selfCoordinate,
+                       face_th=12,
+                       hard_th=90):
+    robotHeadingAngle = self.getRollPitchYaw()[2]
+    turningAngle = Functions.calculateTurningAngleAccordingToRobotHeading(
+      ballCoordinate, selfCoordinate, robotHeadingAngle
+    )
+
+    if abs(turningAngle) >= hard_th:
+      return self.getTurningMotion(turningAngle)
+
+    if abs(turningAngle) <= face_th:
+      return None
+
+    return self.getTurningMotion(turningAngle)
+
+  # ----------------------------------------------------------
+  # TRACK BALL Y (now ALSO faces ball first, per your request)
+  # ----------------------------------------------------------
+  def _track_ball_y(self, target_x, ball_y, ballCoordinate, selfCoordinate):
     sx, sy = selfCoordinate[0], selfCoordinate[1]
+
+    tm_ball = self._face_ball_first(ballCoordinate, selfCoordinate, face_th=12, hard_th=90)
+    if tm_ball is not None:
+      return tm_ball
 
     y_clamp = 1.5
     y_target = max(-y_clamp, min(y_clamp, ball_y))
     y_diff = y_target - sy
 
-    # IMPORTANT: If |y_diff| <= 1, do NOT turn. Just sidestep.
     if abs(y_diff) <= 1.0:
       return self.motions.sideStepRight if y_diff > 0 else self.motions.sideStepLeft
-
-    # Only when far in Y do we consider turning + sprint
-    robotHeadingAngle = self.getRollPitchYaw()[2]
-    target = [target_x, y_target]
-
-    turningAngle = Functions.calculateTurningAngleAccordingToRobotHeading(target, selfCoordinate, robotHeadingAngle)
-    turningMotion = self.getTurningMotion(turningAngle)
-    if turningMotion is not None:
-      return turningMotion
 
     self._loop_forwards_sprint()
     return self.motions.forwardsSprint
 
+  # ----------------------------
+  # helper: choose clear/shoot like RedForward (mirrored to RED goal)
+  # ----------------------------
   def _clear_like_forward(self, ballCoordinate, selfCoordinate):
     robotHeadingAngle = self.getRollPitchYaw()[2]
     bodyDistanceFromBall = Functions.calculateDistance(ballCoordinate, selfCoordinate)
@@ -104,7 +133,6 @@ class Defender(SoccerRobot):
           return self.motions.sideStepRight
 
       else:
-        # Kick if very close
         if bodyDistanceFromBall < 0.2:
           if hasattr(self.motions, "rightShoot"):
             return self.motions.rightShoot
@@ -124,11 +152,36 @@ class Defender(SoccerRobot):
     elif self.checkGoal() == -1:
       return self.motions.standInit
 
-    if selfCoordinate[2] < 0.2:
-      if self.getLeftSonarValue() == 2.55 and self.getRightSonarValue() == 2.55:
-        return self.motions.standUpFromBack
-      else:
-        return self.motions.standUpFromFront
+    # ----------------------------
+    # STAND-UP (fixed: prevent double-trigger)
+    # ----------------------------
+    # If a stand-up motion is currently playing, let it finish.
+    if self._is_standup_motion(self.currentlyMoving) and not self.currentlyMoving.isOver():
+      return self.currentlyMoving
+
+    # After stand-up, wait a little so GPS/pose settles.
+    if getattr(self, "_standup_cooldown", 0) > 0:
+      return self.motions.standInit
+
+    # Detect fallen (keep your z check, but require IMU tilt too)
+    roll, pitch, _ = self.getRollPitchYaw()
+    fallen = (selfCoordinate[2] < 0.2) and (abs(roll) > 0.6 or abs(pitch) > 0.6)
+
+    if fallen:
+      # Lock stand-up choice so it doesn't flip between front/back
+      if not hasattr(self, "_standup_choice"):
+        if self.getLeftSonarValue() == 2.55 and self.getRightSonarValue() == 2.55:
+          self._standup_choice = self.motions.standUpFromBack
+        else:
+          self._standup_choice = self.motions.standUpFromFront
+
+      # Start stand-up; then set cooldown to prevent immediate re-trigger
+      self._standup_cooldown = int(1200 / TIME_STEP)
+      return self._standup_choice
+
+    # If upright, clear locked standup choice (so next fall re-evaluates)
+    if hasattr(self, "_standup_choice"):
+      delattr(self, "_standup_choice")
 
     if self.getBallPriority() == "R":
       return self.motions.standInit
@@ -149,6 +202,13 @@ class Defender(SoccerRobot):
     fwL_zone  = self._zone(fwL)
     fwR_zone  = self._zone(fwR)
 
+    # ==========================================================
+    # ALWAYS face ball first before any other logic
+    # ==========================================================
+    tm0 = self._face_ball_first(ballCoordinate, selfCoordinate, face_th=12, hard_th=90)
+    if tm0 is not None:
+      return tm0
+
     # ----------------------------
     # COLLISION AVOIDANCE
     # ----------------------------
@@ -166,36 +226,26 @@ class Defender(SoccerRobot):
       if 10 <= self_zone <= 12:
         z11 = BlueTeamStrategies.PLAY_ZONE[11]
         standby_x = (z11[0][0] + z11[1][0]) / 2.0
-        return self._track_ball_y(standby_x, by, selfCoordinate)
+        return self._track_ball_y(standby_x, by, ballCoordinate, selfCoordinate)
 
       z13 = BlueTeamStrategies.PLAY_ZONE[13]
       guard_x = (z13[0][0] + z13[1][0]) / 2.0
-      return self._track_ball_y(guard_x, by, selfCoordinate)
+      return self._track_ball_y(guard_x, by, ballCoordinate, selfCoordinate)
 
     # ======================================================
-    # ✅ FIXED ENGAGE (ballZone >= 13)
-    # - If close -> clear immediately (do NOT keep turning)
-    # - If far  -> turn (only if needed) then sprint
+    # ballZone >= 13 : chase + clear
     # ======================================================
     if ball_zone >= 13:
       dist = Functions.calculateDistance(ballCoordinate, selfCoordinate)
 
-      # CLOSE: kick/clear NOW (don’t get stuck in turning)
       if dist < 0.25:
         return self._clear_like_forward(ballCoordinate, selfCoordinate)
-
-      # FAR: orient + go
-      robotHeadingAngle = self.getRollPitchYaw()[2]
-      turningAngle = Functions.calculateTurningAngleAccordingToRobotHeading(ballCoordinate, selfCoordinate, robotHeadingAngle)
-      turningMotion = self.getTurningMotion(turningAngle)
-      if turningMotion is not None:
-        return turningMotion
 
       self._loop_forwards_sprint()
       return self.motions.forwardsSprint
 
     # ----------------------------
-    # (2) ballZone < 13 -> your striker/strip rules
+    # ballZone < 13 -> striker/strip rules
     # ----------------------------
     both_strikers_opponent = (fwL_zone < 10 and fwR_zone < 10)
     both_strikers_ge12     = (fwL_zone >= 10 and fwR_zone >= 10)
@@ -209,19 +259,12 @@ class Defender(SoccerRobot):
       self._log(f"ENTER_STRIP: ballZ={ball_zone} fwLZ={fwL_zone} fwRZ={fwR_zone} selfX={sx:.2f} -> x<=0.00")
 
       if sx > enter_x:
-        robotHeadingAngle = self.getRollPitchYaw()[2]
-        enter_y = max(-1.5, min(1.5, by))
-        turningAngle = Functions.calculateTurningAngleAccordingToRobotHeading([enter_x, enter_y], selfCoordinate, robotHeadingAngle)
-        turningMotion = self.getTurningMotion(turningAngle)
-        if turningMotion is not None:
-          return turningMotion
-
         self._loop_forwards_sprint()
         return self.motions.forwardsSprint
 
       z11 = BlueTeamStrategies.PLAY_ZONE[11]
       standby_x = (z11[0][0] + z11[1][0]) / 2.0
-      return self._track_ball_y(standby_x, by, selfCoordinate)
+      return self._track_ball_y(standby_x, by, ballCoordinate, selfCoordinate)
 
     if both_strikers_ge12:
       if self_zone < 13:
@@ -230,7 +273,7 @@ class Defender(SoccerRobot):
 
       z13 = BlueTeamStrategies.PLAY_ZONE[13]
       guard_x = (z13[0][0] + z13[1][0]) / 2.0
-      return self._track_ball_y(guard_x, by, selfCoordinate)
+      return self._track_ball_y(guard_x, by, ballCoordinate, selfCoordinate)
 
     if at_least_one_ge10:
       if 10 <= self_zone <= 12:
@@ -239,21 +282,27 @@ class Defender(SoccerRobot):
 
       z13 = BlueTeamStrategies.PLAY_ZONE[13]
       guard_x = (z13[0][0] + z13[1][0]) / 2.0
-      return self._track_ball_y(guard_x, by, selfCoordinate)
+      return self._track_ball_y(guard_x, by, ballCoordinate, selfCoordinate)
 
     if self_zone < 13:
       return self.motions.backwards if hasattr(self.motions, "backwards") else self.motions.standInit
 
     z13 = BlueTeamStrategies.PLAY_ZONE[13]
     guard_x = (z13[0][0] + z13[1][0]) / 2.0
-    return self._track_ball_y(guard_x, by, selfCoordinate)
+    return self._track_ball_y(guard_x, by, ballCoordinate, selfCoordinate)
 
   # -------------------------------------------------
   def run(self):
     while self.robot.step(TIME_STEP) != -1:
+      # cooldown tick every step
+      self._standup_tick()
 
       if self.isNewBallDataAvailable():
         self.getSupervisorData()
+
+        if hasattr(self, "runCollisionAvoidanceStep") and self.runCollisionAvoidanceStep():
+          print(f"[{self.name}] AVOID_ACTIVE cooldown={getattr(self, 'avoidanceCooldown', -1)}")
+          continue
 
         ballCoordinate = self.getBallData()
         selfCoordinate = self.getSelfCoordinate()
