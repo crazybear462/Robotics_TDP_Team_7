@@ -22,8 +22,8 @@ if robotName == "BLUE_GK":
 elif robotName == "BLUE_DEF":
     robotController = Defender(robot)
 elif robotName == "BLUE_FW_L":
-    # robotController = ForwardLeft(robot)
-    robotController = Forward(robot)
+     robotController = ForwardLeft(robot)
+    #robotController = Forward(robot)
 else:
 
     robotController = ForwardRight(robot)

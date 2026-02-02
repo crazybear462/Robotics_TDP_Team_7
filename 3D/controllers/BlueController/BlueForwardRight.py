@@ -79,25 +79,25 @@ class ForwardRight (SoccerRobot):
         # Check whether the robot falls down.
         robotHeightFromGround = selfCoordinate[2]
 
-        if robotHeightFromGround < 0.2:
-          if self.getLeftSonarValue() == 2.55 and self.getRightSonarValue() == 2.55:
-            decidedMotion = self.motions.standUpFromBack
-          else:
-            decidedMotion = self.motions.standUpFromFront
+        if robotHeightFromGround < 0.27:
+            if self.getLeftSonarValue() == 2.55 and self.getRightSonarValue() == 2.55:
+                decidedMotion = self.motions.standUpFromBack
+            else:
+                decidedMotion = self.motions.standUpFromFront
+            if self.isNewMotionValid(decidedMotion):
+                if self.currentlyMoving.name != decidedMotion.name:
+                    boolean = self.currentlyMoving and \
+                          (self.currentlyMoving.name == self.motions.forwards50.name and decidedMotion.name != self.motions.forwards50.name)
+                    if boolean:
+                        self.interruptMotion()
+                    self.clearMotionQueue()
+                    if boolean:
+                        self.addMotionToQueue(self.motions.standInit)
+                    self.addMotionToQueue(decidedMotion)
 
-          if self.isNewMotionValid(decidedMotion):
-              boolean = self.currentlyMoving and\
-                  (self.currentlyMoving.name == self.motions.forwards50.name and decidedMotion.name != self.motions.forwards50.name)
-              if boolean:
-                  self.interruptMotion()
-              self.clearMotionQueue()
-              if boolean:
-                  self.addMotionToQueue(self.motions.standInit)
-              self.addMotionToQueue(decidedMotion)
+            self.startMotion()
 
-          self.startMotion()
-
-        # Check the oponent has ball priority.
+        # Check the opponent has ball priority.
         elif self.getBallPriority() == "R":
           decidedMotion = self.motions.standInit
 
@@ -262,7 +262,7 @@ class ForwardRight (SoccerRobot):
     if distanceFromBall < 0.22:
       return self.motions.handWave,1
     turningAngle = Functions.calculateTurningAngleAccordingToRobotHeading(ballCoordinate, selfCoordinate, robotHeadingAngle)
-    
+
     if turningAngle > 50:
       return self.motions.turnLeft60,0
     elif turningAngle > 30:

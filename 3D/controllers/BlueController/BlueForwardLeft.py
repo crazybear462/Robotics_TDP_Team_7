@@ -21,6 +21,7 @@ class ForwardLeft (SoccerRobot):
 
     post_coordinate = [-4.86,-0.717,0.0799]
     our_post = [4.86, 0]
+    their_post = [-4.86, 0]
     flag1=0
     flag2=0
     goto_Coordinate=[0,0,0]
@@ -28,9 +29,8 @@ class ForwardLeft (SoccerRobot):
     count_0=0
     count_1=0
     while self.robot.step(TIME_STEP) != -1:
-
+      print(f"--- THE BALL OWNER IS ---\n", flush=True)
       if self.isNewBallDataAvailable():
-        print("---- PyCharm Slow WALK ----")
         self.getSupervisorData()
         # Use the ballData (location) to do something.
         data = self.supervisorData
@@ -38,7 +38,6 @@ class ForwardLeft (SoccerRobot):
         ballCoordinate = self.getBallData()
         # print("RedForward - ballCoordinate: ", ballCoordinate)
         selfCoordinate = self.getSelfCoordinate()
-        # print(self.ballOwner)
         # rightForward = [data[33],data[34],data[35]]
         # redForward = [data[21],data[22],data[23]]
         # blueDef = [data[27],data[28],data[29]]
@@ -74,6 +73,7 @@ class ForwardLeft (SoccerRobot):
 
 
         # Sorts by index 0 (x) in descending order (highest to lowest)
+        # This shows the closest robot to our goal
         red_team_sorted = sorted(red_team, key=lambda robot: robot[0], reverse=True)
 
         # Find the closest team member to the ball
@@ -82,13 +82,16 @@ class ForwardLeft (SoccerRobot):
         try: # This is for Both Red and Blue
             rob_number = robot_names.index(ballOwner)  # Return the index of the robot with the ball
 
-            rob_pos = robots_positions[rob_number]  # Returns the position of the robot on the field
+            ball_owner_pos = robots_positions[rob_number]  # Returns the position of the robot on the field
             rob_dist_ball = robot_dist_from_ball[rob_number]  # That robots distance from the ball
         except ValueError:
             # If ballOwner is not in our list (e.g. "NONE" or glitch), set defaults
             rob_number = -1
-            rob_pos = [0, 0, 0]
+            ball_owner_pos = [0, 0]
             rob_dist_ball = 999
+
+
+        print(ballOwner)
 
         # Check the goal scored to balance itself.
         if self.checkGoal() == 1:
@@ -183,7 +186,7 @@ class ForwardLeft (SoccerRobot):
 
                     else: # I am not the closest robot. Let me get in position to stop an attack
                         near_red_to_goal = max(robot[0] for robot in red_team)
-                        if red_team_sorted[0] == rob_pos: # Rob_Pos is the opponent here
+                        if red_team_sorted[0] == ball_owner_pos: # Rob_Pos is the opponent here
                             # This means the closest player to the goal (opp) is also closest to the ball
                             # I'll mark someone I am closer to
                             # Slight issue, just because I am not the closest to the ball
@@ -194,17 +197,15 @@ class ForwardLeft (SoccerRobot):
                             print("hello there")
                             if target_opponent[0] < 0:# Opponent is still in his defensive half
                                 print("Target is inactive, commence double team")
-
-                            else:  # He crossed the halfway line
-                                print("Target is active")
-                                marking_distance = 0.5 # How close the striker should be to opponent
-                                marking_vector_x = our_post[0] - target_opponent[0]
-                                marking_vector_y = our_post[1] - target_opponent[1]
+                                target_opponent = red_team_sorted[0]
+                                marking_distance = 0.5  # How close the striker should be to opponent
+                                marking_vector_y = (our_post[0] - target_opponent[0]) * -1 # Swiched the vectors to mark by the
+                                marking_vector_x = our_post[1] - target_opponent[1] # side of the opponent (90 deg clockwise)
                                 vector_dist = Functions.calculateDistance(our_post, target_opponent)
-                                marking_point_x = (marking_vector_x/vector_dist) * marking_distance
-                                marking_point_y = (marking_vector_y/vector_dist) * marking_distance
-                                # All these lines plots a vector that is 0.5 meters in length and is pointing towards goal
-                                target_point = [target_opponent[0]+marking_point_x, target_opponent[1]+marking_point_y]
+                                marking_point_x = (marking_vector_x / vector_dist) * marking_distance
+                                marking_point_y = (marking_vector_y / vector_dist) * marking_distance
+                                target_point = [target_opponent[0] + marking_point_x,
+                                                target_opponent[1] + marking_point_y]
                                 decidedMotion, flag1 = self.decideMotion(target_point, selfCoordinate,
                                                                          post_coordinate, motion=self.motions.standInit)
                                 if self.isNewMotionValid(decidedMotion):
@@ -220,10 +221,51 @@ class ForwardLeft (SoccerRobot):
                                 self.startMotion()
 
 
+                            else:  # He crossed the halfway line
+                                print("Target is active")
+                                marking_distance = 0.5 # How close the striker should be to opponent
+                                marking_vector_x = our_post[0] - target_opponent[0]
+                                marking_vector_y = our_post[1] - target_opponent[1]
+                                vector_dist = Functions.calculateDistance(our_post, target_opponent)
+                                marking_point_x = (marking_vector_x/vector_dist) * marking_distance
+                                marking_point_y = (marking_vector_y/vector_dist) * marking_distance
+                                # All these lines plots a vector that is 0.5 meters in length and is pointing towards goal
+                                target_point = [target_opponent[0]+marking_point_x, target_opponent[1]+marking_point_y]
+                                decidedMotion, flag1 = self.decideMotion(target_point, selfCoordinate,
+                                                                         post_coordinate, motion=self.motions.standInit,
+                                                                         turn_location=target_opponent)
+                                if self.isNewMotionValid(decidedMotion):
+                                    boolean = self.currentlyMoving and \
+                                              (self.currentlyMoving.name == self.motions.forwards50.name and
+                                               decidedMotion.name != self.motions.forwards50.name)
+                                    if boolean:
+                                        self.interruptMotion()
+                                    self.clearMotionQueue()
+                                    if boolean:
+                                        self.addMotionToQueue(self.motions.standInit)
+                                    self.addMotionToQueue(decidedMotion)
+                                self.startMotion()
+
+
                 elif ballOwner=='BLUE_FW_R':
-                    if rightForward[0]>-4.47 and rightForward[0]<4.44 and rightForward[1]>0 and rightForward[1]<1.5:
-                        goto_Coordinate[0]= rightForward[0] - 1.5
-                        goto_Coordinate[1] = rightForward[0] - 1
+                    if rightForward[0]>-4.47 and rightForward[0]<4.44 and rightForward[1]>0 and rightForward[1]<2.2:
+                        goto_Coordinate[0]= rightForward[0] - 0.5
+                        # Logic to avoid other players
+                        avoid_distance = 0.3  # How far the opponents should be from me
+
+                        obstructor = False
+                        obstructor_position = 0
+                        for robot in red_team[1:]: # Goalkeeper not included
+                            obstruct = Functions.getDistanceFromLine(selfCoordinate[:2],their_post, robot)
+                            if obstruct < avoid_distance: # If the robot is within 3m to my path
+                                obstructor = True
+                                obstructor_position = robot
+                                goto_Coordinate[1] = selfCoordinate[1]
+                                break # Just worry about one robot at a time
+                            else:
+                                goto_Coordinate[1] = their_post[1]
+
+
                         goto_Coordinate[2] = 0.343
                         decidedMotion, useless_flag= self.decideMotion(goto_Coordinate, selfCoordinate, post_coordinate)
                         if self.isNewMotionValid(decidedMotion):
@@ -348,7 +390,7 @@ class ForwardLeft (SoccerRobot):
         print("NO BALL DATA!!!")
 
   # Override decideMotion
-  def decideMotion(self, ballCoordinate, selfCoordinate, post_coordinate, motion=None):
+  def decideMotion(self, ballCoordinate, selfCoordinate, post_coordinate, motion=None, turn_location=None):
     
     robotHeadingAngle = self.getRollPitchYaw()[2]
     distanceFromBall = Functions.calculateDistance(ballCoordinate, selfCoordinate)
@@ -358,8 +400,12 @@ class ForwardLeft (SoccerRobot):
         return self.motions.handWave,1
       else:
         return motion, 1
-    turningAngle = Functions.calculateTurningAngleAccordingToRobotHeading(ballCoordinate, selfCoordinate, robotHeadingAngle)
-    
+
+    if turn_location is None:
+        turningAngle = Functions.calculateTurningAngleAccordingToRobotHeading(ballCoordinate, selfCoordinate, robotHeadingAngle)
+    else:
+        turningAngle = Functions.calculateTurningAngleAccordingToRobotHeading(turn_location, selfCoordinate,
+                                                                              robotHeadingAngle)
     if turningAngle > 50:
       return self.motions.turnLeft60,0
     elif turningAngle > 30:
